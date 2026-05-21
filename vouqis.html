@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vouqis | MCP Server Reliability Scoring for Production</title>
+    <meta name="description"
+        content="Audit any MCP server with active probes, a Trust Score, and CI gating. Vouqis helps engineers decide whether a tool server is safe to integrate before production." />
+    <meta property="og:title" content="Vouqis: trust scoring for MCP servers" />
+    <meta property="og:description"
+        content="Audit any MCP server with active probes, a 0 to 100 Trust Score, and CI gating before your agent ships to production." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Vouqis: trust scoring for MCP servers" />
+    <meta name="twitter:description"
+        content="Vouqis audits MCP server reliability before production. Active probes, score breakdown, report URL, CI fail gate. Built for engineers shipping agents." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --surface-2: #21262d;
+            --text: #f0f6fc;
+            --muted: #c9d1d9;
+            --faint: #8b949e;
+            --blue: #60a5fa;
+            --blue-h: #3b82f6;
+            --green: #4ade80;
+            --red: #f87171;
+            --line: rgba(255, 255, 255, .08);
+            --line-2: rgba(96, 165, 250, .22);
+            --shadow: 0 24px 80px rgba(0, 0, 0, .45);
+            --shadow-soft: 0 12px 40px rgba(0, 0, 0, .35);
+            --radius: 20px;
+            --radius-sm: 16px;
+            --radius-xs: 12px;
+            --container: 1200px;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            scroll-behavior: smooth
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none
+        }
+
+        .wrap {
+            max-width: var(--container);
+            margin: 0 auto;
+            padding-left: 32px;
+            padding-right: 32px;
+        }
+
+        .header {
+            height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            background: #0d1117;
+            z-index: 100
+        }
+
+        .header-inner {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+        }
+
+        .brand {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            pointer-events: auto;
+        }
+
+        .brand.hidden {
+            opacity: 0;
+            transform: translateY(-8px);
+            pointer-events: none;
+        }
+
+        .brand a {
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        @keyframes waitlist-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 8px rgba(255, 255, 255, 0.15),
+                    0 0 20px rgba(255, 255, 255, 0.08);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(255, 255, 255, 0.55),
+                    0 0 40px rgba(255, 255, 255, 0.25),
+                    0 0 60px rgba(200, 240, 255, 0.12);
+            }
+        }
+
+        .toplink {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0d1117;
+            background: #ffffff;
+            padding: 8px 20px;
+            border-radius: 999px;
+            transition: transform 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            animation: waitlist-glow 2s ease-in-out infinite;
+        }
+
+        .toplink:hover {
+            background: #ffffff;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.6),
+                0 0 60px rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+            color: #0d1117;
+            animation-play-state: paused;
+        }
+
+        .hero {
+            padding: 160px 0 96px
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 56% 44%;
+            gap: 72px;
+            align-items: center
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--blue);
+            margin-bottom: 16px
+        }
+
+        h1 {
+            font-size: 56px;
+            line-height: 1.02;
+            letter-spacing: -.04em;
+            margin: 0 0 20px;
+            max-width: 11ch
+        }
+
+        .sub {
+            font-size: 20px;
+            line-height: 1.5;
+            color: var(--muted);
+            max-width: 34rem;
+            margin: 0 0 16px
+        }
+
+        .riskline {
+            font-size: 16px;
+            line-height: 1.55;
+            color: var(--text);
+            opacity: .86;
+            max-width: 38rem;
+            margin: 0 0 24px
+        }
+
+        .form {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            max-width: 580px;
+            margin: 0 0 12px
+        }
+
+        .input {
+            flex: 1;
+            height: 48px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: var(--surface-2);
+            color: var(--text);
+            padding: 0 16px;
+            font-size: 16px;
+            outline: none
+        }
+
+        .input::placeholder {
+            color: var(--faint)
+        }
+
+        .input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 4px rgba(96, 165, 250, .14)
+        }
+
+        .btn {
+            height: 48px;
+            border: 0;
+            border-radius: 12px;
+            background: var(--blue);
+            color: #fff;
+            padding: 0 20px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            white-space: nowrap
+        }
+
+        .btn:hover {
+            background: var(--blue-h)
+        }
+
+        .micro {
+            font-size: 13px;
+            color: var(--faint);
+            line-height: 1.4
+        }
+
+        .secondary {
+            display: inline-flex;
+            margin-top: 14px;
+            color: var(--blue);
+            font-weight: 600;
+            font-size: 14px
+        }
+
+        .terminal {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            min-height: 430px
+        }
+
+        .terminal-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px
+        }
+
+        .cmd {
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 14px;
+            color: var(--text);
+            opacity: .95
+        }
+
+        .chip {
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(74, 222, 128, .28);
+            color: var(--green);
+            background: rgba(74, 222, 128, .08)
+        }
+
+        .score-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 0 16px;
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line)
+        }
+
+        .score {
+            font-size: 54px;
+            line-height: 1;
+            letter-spacing: -.05em;
+            font-weight: 800
+        }
+
+        .score-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px
+        }
+
+        .score-label {
+            font-size: 13px;
+            color: var(--faint)
+        }
+
+        .verdict {
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: .08em;
+            padding: 8px 12px;
+            border-radius: 999px
+        }
+
+        .verdict.approved {
+            background: rgba(74, 222, 128, .12);
+            color: var(--green);
+            border: 1px solid rgba(74, 222, 128, .28)
+        }
+
+        .probe-list {
+            margin: 18px 0 0;
+            display: grid;
+            gap: 10px
+        }
+
+        .probe {
+            display: grid;
+            grid-template-columns: 110px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, .02);
+            border: 1px solid var(--line)
+        }
+
+        .probe-id {
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 12px;
+            color: var(--blue)
+        }
+
+        .probe-name {
+            font-size: 14px;
+            color: var(--text)
+        }
+
+        .probe-status {
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 12px;
+            color: var(--green)
+        }
+
+        .report {
+            margin-top: 16px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: #0b0f14
+        }
+
+        .report .label {
+            font-size: 12px;
+            color: var(--faint);
+            margin-bottom: 6px
+        }
+
+        .report .url {
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 13px;
+            color: var(--text)
+        }
+
+        .ci {
+            margin-top: 12px;
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .band {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding: 0 0 96px;
+        }
+
+        .metric {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 16px;
+            min-height: 96px
+        }
+
+        .metric .num {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -.04em;
+            line-height: 1
+        }
+
+        .metric .label {
+            margin-top: 8px;
+            font-size: 14px;
+            color: var(--muted);
+            line-height: 1.4
+        }
+
+        .metric .src {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--faint)
+        }
+
+        section {
+            padding: 96px 0;
+        }
+
+        .section-head {
+            max-width: 760px;
+            margin-bottom: 36px;
+        }
+
+        h2 {
+            font-size: 36px;
+            line-height: 1.08;
+            letter-spacing: -.04em;
+            margin: 0 0 20px
+        }
+
+        .lead {
+            font-size: 18px;
+            line-height: 1.6;
+            color: var(--muted);
+            margin: 0
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 32px
+        }
+
+        .card h3 {
+            margin: 0 0 10px;
+            font-size: 18px;
+            line-height: 1.2
+        }
+
+        .card p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.55;
+            font-size: 15px
+        }
+
+        .mono {
+            font-family: "Geist Mono", ui-monospace, monospace
+        }
+
+        .formula {
+            background: #0b0f14;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--blue);
+            border-radius: 16px;
+            padding: 20px;
+            font-family: "Geist Mono", ui-monospace, monospace;
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text)
+        }
+
+        .weights {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 32px
+        }
+
+        .weight .pct {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -.04em
+        }
+
+        .weight .desc {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.5
+        }
+
+        .thresholds {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 24px
+        }
+
+        .th {
+            padding: 18px;
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: var(--surface)
+        }
+
+        .th .t {
+            font-size: 12px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--faint);
+            margin-bottom: 8px
+        }
+
+        .th .r {
+            font-size: 18px;
+            font-weight: 700
+        }
+
+        .th.approved .r {
+            color: var(--green)
+        }
+
+        .th.risky .r {
+            color: var(--blue)
+        }
+
+        .th.bad .r {
+            color: var(--red)
+        }
+
+        .compare {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr 1fr;
+            gap: 16px;
+            align-items: stretch
+        }
+
+        .compare .head {
+            background: rgba(255, 255, 255, .04);
+            font-size: 13px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .08em
+        }
+
+        .compare>div {
+            padding: 16px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: var(--surface)
+        }
+
+        .ok {
+            color: var(--green);
+            font-family: "Geist Mono"
+        }
+
+        .no {
+            color: var(--red);
+            font-family: "Geist Mono"
+        }
+
+        .partial {
+            color: var(--blue);
+            font-family: "Geist Mono"
+        }
+
+        .faq {
+            display: grid;
+            gap: 16px
+        }
+
+        .qa {
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: var(--surface);
+            overflow: hidden
+        }
+
+        .q {
+            padding: 16px 18px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .a {
+            padding: 0 18px 16px;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 15px;
+            display: none
+        }
+
+        .qa.open .a {
+            display: block
+        }
+
+        .footer {
+            padding: 80px 0 96px;
+            border-top: 1px solid var(--line)
+        }
+
+        .footer-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 24px
+        }
+
+        .footer h2 {
+            font-size: 28px;
+            margin-bottom: 10px
+        }
+
+        .footer p {
+            margin: 0 0 16px;
+            color: var(--muted);
+            max-width: 680px;
+            line-height: 1.6
+        }
+
+        .tiny {
+            font-size: 12px;
+            color: var(--faint);
+            margin-top: 18px
+        }
+
+        .button-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 48px;
+            padding: 0 20px;
+            border-radius: 12px;
+            background: var(--blue);
+            color: #fff;
+            font-weight: 700
+        }
+
+        .trustband {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px
+        }
+
+        .pill {
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .03);
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .split-note {
+            font-size: 12px;
+            color: var(--faint);
+            margin-top: 8px
+        }
+
+        .card,
+        .metric,
+        .th,
+        .qa {
+            box-shadow: none;
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover,
+        .metric:hover,
+        .th:hover {
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 1199px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+                gap: 32px
+            }
+
+            h1 {
+                max-width: 12ch
+            }
+
+            .band {
+                grid-template-columns: repeat(2, 1fr)
+            }
+
+            .grid-3,
+            .weights,
+            .thresholds {
+                grid-template-columns: 1fr
+            }
+
+            .compare {
+                grid-template-columns: 1fr
+            }
+
+            .footer-box {
+                flex-direction: column
+            }
+
+            .hero {
+                padding: 72px 0 80px
+            }
+
+            section {
+                padding: 80px 0
+            }
+
+            .band {
+                padding: 0 0 80px
+            }
+        }
+
+        @media (max-width: 639px) {
+            .wrap {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .header {
+                height: 64px
+            }
+
+            .hero {
+                padding: 48px 0 64px
+            }
+
+            h1 {
+                font-size: 40px;
+                line-height: 1.03
+            }
+
+            .sub {
+                font-size: 16px
+            }
+
+            .riskline {
+                font-size: 15px
+            }
+
+            .form {
+                flex-direction: column;
+                align-items: stretch
+            }
+
+            .btn,
+            .button-link {
+                width: 100%
+            }
+
+            .terminal {
+                padding: 18px;
+                min-height: auto
+            }
+
+            .score {
+                font-size: 44px
+            }
+
+            .probe {
+                grid-template-columns: 1fr;
+                gap: 6px
+            }
+
+            .band {
+                grid-template-columns: 1fr;
+                padding: 0 0 64px;
+            }
+
+            section {
+                padding: 64px 0;
+            }
+
+            .section-head {
+                margin-bottom: 24px;
+            }
+        }
+
+        /* Smooth Scroll-Triggered Reveal Animations (Apple Style) */
+        .reveal-on-scroll {
+            opacity: 0;
+            transform: translateY(40px) scale(0.98);
+            filter: blur(8px);
+            transition: opacity 1.4s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 1.4s cubic-bezier(0.16, 1, 0.3, 1),
+                filter 1.4s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: transform, opacity, filter;
+        }
+
+        .reveal-on-scroll.reveal-active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+        }
+
+        .stagger-item {
+            opacity: 0;
+            transform: translateY(30px) scale(0.99);
+            filter: blur(6px);
+            transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 1.2s cubic-bezier(0.16, 1, 0.3, 1),
+                filter 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+            will-change: transform, opacity, filter;
+        }
+
+        .stagger-item.reveal-active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+        }
+
+        /* Stagger delays up to 6 items */
+        .stagger-item:nth-child(1) {
+            transition-delay: 0.05s;
+        }
+
+        .stagger-item:nth-child(2) {
+            transition-delay: 0.15s;
+        }
+
+        .stagger-item:nth-child(3) {
+            transition-delay: 0.25s;
+        }
+
+        .stagger-item:nth-child(4) {
+            transition-delay: 0.35s;
+        }
+
+        .stagger-item:nth-child(5) {
+            transition-delay: 0.45s;
+        }
+
+        .stagger-item:nth-child(6) {
+            transition-delay: 0.55s;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-inner">
+            <div class="brand"><a href="index.html">VOUQIS</a></div>
+            <a class="toplink" href="https://tally.so/r/LZapWy" target="_blank">Join the waitlist</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero wrap reveal-on-scroll">
+            <div class="hero-grid">
+                <div>
+                    <div class="eyebrow">MCP reliability for production</div>
+                    <h1>Score any MCP server before your agent trusts it.</h1>
+                    <p class="sub">Vouqis runs 5 deterministic probes against any MCP server, returns a 0 to 100 Trust
+                        Score, and fails CI when the server is too risky to ship.</p>
+                    <p class="riskline">The MCP ecosystem is moving fast. Reliability is not keeping up. Median servers
+                        pass only 71% of tool calls, and chained tool flows collapse fast when each call is only mostly
+                        working.</p>
+                    <div id="waitlist" style="margin: 0 0 16px">
+                        <a class="button-link" href="https://tally.so/r/LZapWy" target="_blank">Join the waitlist</a>
+                    </div>
+                    <div class="micro">No SDK install on the server. JSON-RPC only.</div>
+                    <a class="secondary" href="#mechanics">See the audit flow</a>
+                    <div class="trustband">
+                        <span class="pill">Live Next.js app</span>
+                        <span class="pill">Published npm CLI</span>
+                        <span class="pill">Supabase integration</span>
+                        <span class="pill">Polar payments</span>
+                        <span class="pill">Resend email</span>
+                    </div>
+                </div>
+                <div class="terminal">
+                    <div class="terminal-top">
+                        <div class="cmd">vouqis audit https://mcp.context7.com/mcp</div>
+                        <div class="chip">APPROVED</div>
+                    </div>
+                    <div class="score-row">
+                        <div>
+                            <div class="score">82</div>
+                            <div class="score-label">Trust Score / 100</div>
+                        </div>
+                        <div class="score-meta">
+                            <div class="verdict approved">APPROVED</div>
+                            <div class="score-label">Threshold: 80</div>
+                        </div>
+                    </div>
+                    <div class="probe-list">
+                        <div class="probe">
+                            <div class="probe-id">mal-01</div>
+                            <div class="probe-name">Malformed JSON-RPC rejection</div>
+                            <div class="probe-status">pass</div>
+                        </div>
+                        <div class="probe">
+                            <div class="probe-id">mis-01</div>
+                            <div class="probe-name">Missing parameter handling</div>
+                            <div class="probe-status">pass</div>
+                        </div>
+                        <div class="probe">
+                            <div class="probe-id">tmo-01</div>
+                            <div class="probe-name">Latency under target</div>
+                            <div class="probe-status">487ms</div>
+                        </div>
+                        <div class="probe">
+                            <div class="probe-id">sch-01</div>
+                            <div class="probe-name">Schema compliance</div>
+                            <div class="probe-status">pass</div>
+                        </div>
+                        <div class="probe">
+                            <div class="probe-id">nul-01</div>
+                            <div class="probe-name">Non-empty response</div>
+                            <div class="probe-status">pass</div>
+                        </div>
+                    </div>
+                    <div class="report">
+                        <div class="label">Report URL</div>
+                        <div class="url">vouqis.vercel.app/report/8f2a</div>
+                        <div class="ci">exit 1 when score &lt; 80</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="band">
+                <div class="metric">
+                    <div class="num">71%</div>
+                    <div class="label">Median MCP servers pass only this many tool calls.</div>
+                    <div class="src">Digital Applied, 2026</div>
+                </div>
+                <div class="metric">
+                    <div class="num">18%</div>
+                    <div class="label">Five chained tool calls succeed at this rate when each call is 71% reliable.
+                    </div>
+                    <div class="src">End-to-end collapse</div>
+                </div>
+                <div class="metric">
+                    <div class="num">1,840ms</div>
+                    <div class="label">P95 latency on stressed servers.</div>
+                    <div class="src">Above the 500ms threshold</div>
+                </div>
+                <div class="metric">
+                    <div class="num">6,200ms</div>
+                    <div class="label">P99 latency on stressed servers.</div>
+                    <div class="src">User-visible failure</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll" id="mechanics">
+            <div class="section-head">
+                <h2>Run one command. Get a report. Fail bad servers in CI.</h2>
+                <p class="lead">Use the CLI or the dashboard. Point Vouqis at any MCP server URL, and it probes the
+                    server over JSON-RPC with no SDK install on the server side. You get a shareable report URL,
+                    verdict, and an exit code you can wire into your pipeline.</p>
+            </div>
+            <div class="grid-3">
+                <div class="card stagger-item">
+                    <h3>1. Audit</h3>
+                    <p>Run <span class="mono">vouqis audit &lt;url&gt;</span> against any MCP server.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3>2. Score</h3>
+                    <p>See a Trust Score, verdict, probe detail, and shareable report URL.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3>3. Gate</h3>
+                    <p>Use <span class="mono">--fail-below 80</span> to exit with code 1 in CI.</p>
+                </div>
+            </div>
+            <div style="margin-top:16px" class="card">
+                <div class="mono" style="font-size:14px;color:var(--text)">vouqis audit &lt;url&gt;</div>
+                <div class="split-note">Returns a Trust Score, verdict, and report URL. In CI, --fail-below 80 exits
+                    with code 1.</div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="section-head">
+                <h2>Five probe types. Ten total checks. No hand-waving.</h2>
+                <p class="lead">Vouqis fires two deterministic probes for each failure class: malformed JSON-RPC
+                    rejection, missing parameter handling, latency under target, schema compliance, and non-empty
+                    response.</p>
+            </div>
+            <div class="grid-2">
+                <div class="card stagger-item">
+                    <h3><span class="mono">mal-01 / mal-02</span></h3>
+                    <p>Malformed JSON-RPC rejection.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3><span class="mono">mis-01 / mis-02</span></h3>
+                    <p>Missing required parameter handling.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3><span class="mono">tmo-01 / tmo-02</span></h3>
+                    <p>Latency under target, P50 under 500ms.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3><span class="mono">sch-01 / sch-02</span></h3>
+                    <p>Schema compliance.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3><span class="mono">nul-01 / nul-02</span></h3>
+                    <p>Non-empty response.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="section-head">
+                <h2>The score is explicit. You can inspect the math.</h2>
+                <p class="lead">Trust Score = 50% pass rate, 30% latency score, 20% error diversity score. The diversity
+                    weight matters because a server failing in 4 modes is architecturally broken, not slightly buggy.
+                </p>
+            </div>
+            <div class="formula">Trust Score = (Pass Rate × 0.50) + (Latency Score × 0.30) + (Error Diversity Score ×
+                0.20)</div>
+            <div class="weights">
+                <div class="card weight stagger-item">
+                    <div class="pct">50%</div>
+                    <div class="desc">Pass rate. How many probes succeed.</div>
+                </div>
+                <div class="card weight stagger-item">
+                    <div class="pct">30%</div>
+                    <div class="desc">Latency score. Penalizes slow servers.</div>
+                </div>
+                <div class="card weight stagger-item">
+                    <div class="pct">20%</div>
+                    <div class="desc">Error diversity. Punishes breadth of failure.</div>
+                </div>
+            </div>
+            <div class="thresholds">
+                <div class="th approved">
+                    <div class="t">APPROVED</div>
+                    <div class="r">80–100</div>
+                </div>
+                <div class="th risky">
+                    <div class="t">RISKY</div>
+                    <div class="r">50–79</div>
+                </div>
+                <div class="th bad">
+                    <div class="t">DO NOT INTEGRATE</div>
+                    <div class="r">0–49</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="section-head">
+                <h2>The category already has expensive failures.</h2>
+                <p class="lead">This is not a theoretical problem. Asana’s MCP incident exposed customer data for 2
+                    weeks. Smithery’s path traversal issue exposed 3,243 servers and leaked thousands of API keys.
+                    mcp-remote had CVE-2025-6514, a CVSS 9.6 RCE in a package with 150M+ downloads.</p>
+            </div>
+            <div class="grid-3">
+                <div class="card stagger-item">
+                    <h3>Asana MCP incident</h3>
+                    <p>Customer data exposure persisted for 2 weeks.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3>Smithery path traversal</h3>
+                    <p>3,243 servers exposed. Thousands of API keys leaked.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3>mcp-remote RCE</h3>
+                    <p>CVSS 9.6 package issue affecting 150M+ downloads.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="section-head">
+                <h2>Static metadata is a weak proxy. Real probes are the product.</h2>
+                <p class="lead">MCPSkills, MCP Scorecard, and mcp-trust-radar analyze repository signals. Anthropic’s
+                    MCP Inspector is useful for manual debugging one call at a time. Vouqis is active testing with a
+                    score, a report, and CI integration.</p>
+            </div>
+            <div class="compare">
+                <div class="head">Capability</div>
+                <div class="head">Static tools</div>
+                <div class="head">MCP Inspector</div>
+                <div class="head">Vouqis</div>
+
+                <div>Active server probes</div>
+                <div class="no">No</div>
+                <div class="partial">Manual</div>
+                <div class="ok">Yes</div>
+
+                <div>Trust score</div>
+                <div class="no">No</div>
+                <div class="no">No</div>
+                <div class="ok">Yes</div>
+
+                <div>Shareable report</div>
+                <div class="no">No</div>
+                <div class="no">No</div>
+                <div class="ok">Yes</div>
+
+                <div>CI fail gate</div>
+                <div class="no">No</div>
+                <div class="no">No</div>
+                <div class="ok">Yes</div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="section-head">
+                <h2>Built for the exact place engineers make adoption calls.</h2>
+                <p class="lead">Use Vouqis during vendor review, before the first integration, and inside CI after every
+                    change to a server you depend on. That makes the trust decision repeatable instead of tribal
+                    knowledge in Slack.</p>
+            </div>
+            <div class="grid-3">
+                <div class="card stagger-item">
+                    <h3>Vendor review</h3>
+                    <p>Audit a server before it enters your stack.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3>First integration</h3>
+                    <p>Block weak servers before the first production call.</p>
+                </div>
+                <div class="card stagger-item">
+                    <h3>CI gate</h3>
+                    <p>Re-run the audit after every change and fail when risk rises.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="card" style="border-color:var(--line-2);box-shadow:var(--shadow-soft)">
+                <div class="section-head" style="margin-bottom:18px">
+                    <h2>Get early access to the CLI, dashboard, and report flow.</h2>
+                    <p class="lead">Join the waitlist for early access, product updates, and launch access to the trust
+                        scoring workflow. Built for engineers shipping MCP-backed agents in production.</p>
+                </div>
+                <div style="margin-top: 24px">
+                    <a class="button-link" href="https://tally.so/r/LZapWy" target="_blank">Join the waitlist</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="section-head">
+                <h2>Questions engineers will ask before signing up.</h2>
+            </div>
+            <div class="faq">
+                <div class="qa open">
+                    <div class="q">Does Vouqis require code changes on the server?<span>+</span></div>
+                    <div class="a">No. It connects over JSON-RPC and probes the server directly.</div>
+                </div>
+                <div class="qa">
+                    <div class="q">Is this only for one MCP implementation?<span>+</span></div>
+                    <div class="a">No. It is designed to audit any MCP server URL.</div>
+                </div>
+                <div class="qa">
+                    <div class="q">Is the score opaque?<span>+</span></div>
+                    <div class="a">No. The score breakdown is exposed in the report so the result can be audited.</div>
+                </div>
+                <div class="qa">
+                    <div class="q">Is this a manual debugger?<span>+</span></div>
+                    <div class="a">No. It is an automated auditor with repeatable probes and CI failure thresholds.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <div class="wrap footer-box">
+                <div>
+                    <h2>Ship MCP integrations with a trust gate.</h2>
+                    <p>If the server cannot survive the probes, it should not reach production. Get on the waitlist and
+                        use the first production-focused MCP reliability auditor.</p>
+                    <a class="button-link" href="https://tally.so/r/LZapWy" target="_blank">Get on the waitlist</a>
+                    <div class="tiny">© Vouqis. Production reliability for MCP servers.</div>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        document.querySelectorAll('.qa .q').forEach(q => {
+            q.addEventListener('click', () => q.parentElement.classList.toggle('open'));
+        });
+
+        // Hide VOUQIS brand on scroll down, show on scroll back up
+        const brand = document.querySelector('.brand');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 40) {
+                brand.classList.add('hidden');
+            } else {
+                brand.classList.remove('hidden');
+            }
+        }, { passive: true });
+
+        // Apple-style scroll reveal and redirect-to-top scroll logic
+        document.addEventListener('DOMContentLoaded', () => {
+            // Force scroll to top on refresh
+            if ('scrollRestoration' in history) {
+                history.scrollRestoration = 'manual';
+            }
+            window.scrollTo(0, 0);
+
+            // Set up Intersection Observer for Apple scroll effects
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px -10% 0px -10%',
+                threshold: 0.05
+            };
+
+            const revealObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('reveal-active');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            // Select all components to observe
+            const targets = document.querySelectorAll('.reveal-on-scroll, .stagger-item');
+            targets.forEach(target => revealObserver.observe(target));
+        });
+    </script>
+</body>
+
+</html>
