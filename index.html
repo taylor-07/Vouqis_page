@@ -872,6 +872,30 @@
         .stagger-item:nth-child(6) {
             transition-delay: 0.55s;
         }
+
+        .video-block {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-top: 32px;
+        }
+
+        .video-block video {
+            width: 100%;
+            height: auto;
+            border-radius: 18px;
+            max-height: 560px;
+            background: #000;
+        }
+
+        .video-caption {
+            margin-top: 14px;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 15px;
+        }
     </style>
 </head>
 
@@ -955,6 +979,13 @@
                         <div class="ci">exit 1 when score &lt; 80</div>
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <section class="wrap reveal-on-scroll">
+            <div class="video-block">
+                <video src="IMG_0159.MP4" controls autoplay muted playsinline></video>
+                <p class="video-caption">Watch the demo to see the Vouqis audit flow and reliability scoring in action.</p>
             </div>
         </section>
 
