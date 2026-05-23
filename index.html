@@ -39,6 +39,7 @@
             --radius-sm: 16px;
             --radius-xs: 12px;
             --container: 1200px;
+            --header-height: 72px;
         }
 
         * {
@@ -68,7 +69,7 @@
         }
 
         .header {
-            height: 72px;
+            height: var(--header-height);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -174,11 +175,12 @@
         }
 
         h1 {
-            font-size: 56px;
-            line-height: 1.02;
+            font-size: clamp(28px, 7vw, 56px);
+            line-height: 1.04;
             letter-spacing: -.04em;
             margin: 0 0 20px;
-            max-width: 11ch
+            max-width: 14ch;
+            word-break: break-word;
         }
 
         .sub {
@@ -803,73 +805,82 @@
         }
 
         @media (max-width: 639px) {
+            :root { --header-height: 64px; }
+
             .wrap {
-                padding-left: 20px;
-                padding-right: 20px;
+                padding-left: 16px;
+                padding-right: 16px;
             }
 
             .header {
-                height: auto;
-                padding: 12px 0;
+                height: var(--header-height);
+                padding: 10px 0;
             }
 
             .header-inner {
                 justify-content: space-between;
                 gap: 10px;
+                padding: 0 16px;
             }
 
             .toplink,
             .button-link {
                 width: 100%;
+                margin: 12px 0;
             }
 
             .hero {
-                padding: 48px 0 64px
+                padding: calc(var(--header-height) + 16px) 0 48px;
             }
 
             h1 {
-                font-size: 40px;
-                line-height: 1.03
+                font-size: clamp(28px, 9vw, 40px);
+                line-height: 1.06;
+                margin-bottom: 12px;
             }
 
             .sub {
-                font-size: 16px
+                font-size: 15px;
             }
 
             .riskline {
-                font-size: 15px
+                font-size: 14px;
             }
 
             .form {
                 flex-direction: column;
-                align-items: stretch
+                align-items: stretch;
             }
 
             .terminal {
-                padding: 18px;
-                min-height: auto
+                padding: 14px;
+                min-height: auto;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
+                overflow: hidden;
             }
 
             .score {
-                font-size: 44px
+                font-size: 40px;
             }
 
             .probe {
                 grid-template-columns: 1fr;
-                gap: 6px
+                gap: 6px;
             }
 
             .band {
                 grid-template-columns: 1fr;
-                padding: 0 0 64px;
+                padding: 0 0 56px;
             }
 
             section {
-                padding: 64px 0;
+                padding: 56px 0;
             }
 
             .section-head {
-                margin-bottom: 24px;
+                margin-bottom: 20px;
             }
 
             .compare {
@@ -877,7 +888,7 @@
             }
 
             .trustband {
-                justify-content: flex-start;
+                justify-content: center;
             }
 
             .footer-box {
